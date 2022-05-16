@@ -1,0 +1,242 @@
+# Raptor - torque-0 Testnet
+
+This testnet will start at the patched version of raptor (`v2.1.0`). You will need to use the distributed binary from the raptor packages repository.
+
+## If you are reusing a testnet box, do this first
+
+1. Stop your node
+2. Reset `raptord unsafe-reset-all`
+3. Remove genesis `rm .raptor/config/genesis.json`
+4. Remove gentxs `rm -r .raptor/config/gentx/`
+5. If you are using cosmovisor, remove symlink: `rm .raptor/cosmovisor/current`
+6. Remove & recreate upgrades dir: `rm -r .raptor/cosmovisor/upgrades/ && mkdir -p .raptor/cosmovisor/upgrades`
+7. Check genesis bin is `v2.1.0`: `$DAEMON_HOME/cosmovisor/genesis/bin/raptord version`
+8. Remove `seeds` and `persistent_peers` entries in `config.toml` - people will post their peer on discord before genesis
+9. Follow generate gentx as normal below
+
+Once you have deleted the old stuff, your cosmovisor should look like:
+
+```
+.raptor/cosmovisor/
+├── genesis
+│   └── bin
+│       └── raptord
+└── upgrades
+```
+
+**Genesis File**
+
+[Genesis File](/torque-0/genesis.json):
+
+```bash
+   curl -s  https://raw.githubusercontent.com/Karan-3108/testnets/main/torque-0/genesis.json > ~/.raptor/config/genesis.json
+```
+
+**Genesis sha256**
+
+```bash
+sha256sum ~/.raptor/config/genesis.json
+# 41901e4c2df248aeb18e5705709008f6cdae7423182d5ed050244a580894b32b
+```
+
+**raptord version**
+
+```bash
+$ raptord version --long
+name: raptor
+server_name: raptord
+version: v2.1.0
+commit: e6b8c212b178cf575035065b78309aed547b1335
+build_tags: netgo muslc, # THIS BIT IS KEY
+```
+
+**Seed nodes**
+
+```
+8c0ac9bf67ff8ea0b26e915f0dbb44497b8f4ac2@38.146.3.181:26656
+```
+
+**Persistent Peers**
+
+```
+TBC
+```
+
+## Setup
+
+**Prerequisites:** Make sure to have [Golang >=1.17](https://golang.org/).
+
+#### Go setup
+
+You need to ensure your gopath configuration is correct. If the following **'make'** step does not work then you might have to add these lines to your .profile or .zshrc in the users home folder:
+
+```sh
+nano ~/.profile
+```
+
+```
+export GOROOT=/usr/local/go
+export GOPATH=$HOME/go
+export GO111MODULE=on
+export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
+```
+
+Source update .profile
+
+```sh
+source .profile
+```
+
+#### Download and verify:
+
+Note, if you're reusing a box from `uni` or `uni-1` you likely already have the correct binary. If you're using cosmovisor, you can simply follow the steps at the top of this page.
+
+```sh
+# find out where raptord is - will likely be /home/<your-user>/go/bin/raptord
+which raptord
+
+# put new binary there i.e. in path/to/raptor
+wget https://github.com/Karan-3108/raptor/releases/download/v2.1.0/raptord -O /home/<your-user>/go/bin/raptord
+
+# if you run this, you should see build_tags: netgo muslc,
+# if there is a permissions problem use chmod/chown to make sure it is executable
+raptord version --long
+
+# confirm it is using the static lib - should return "not a dynamic executable"
+ldd $(which raptord)
+
+# if you really want to be sure
+# this should return:
+# ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, 
+# Go BuildID=4Ec3fj_EKdvh_u8K3RGJ/JIKOgYFXTJ9LzGROhs8n/uC9gpeaM9MaYurh9DJiN/YcvB8Jc2ivQM2zUSHMhg, stripped
+file $(which raptord)
+```
+
+Check that you have the right Raptor version installed:
+
+```sh
+$ raptord version --long
+name: raptor
+server_name: raptord
+version: v2.1.0
+commit: e6b8c212b178cf575035065b78309aed547b1335
+build_tags: netgo muslc, # THE MUSLC TAG IS KEY
+```
+
+### Minimum hardware requirements
+
+- 8-16GB RAM
+- 100GB of disk space
+- 2 cores
+
+## Setup validator node
+
+Below are the instructions to generate & submit your genesis transaction
+
+### Generate genesis transaction (gentx)
+
+1. Initialize the Raptor directories and create the local genesis file with the correct chain-id:
+
+```bash
+raptord init <moniker-name> --chain-id=torque-0
+```
+
+2. Create a local key pair (skip this step if you already have a key):
+
+```sh
+> raptord keys add <key-name>
+```
+
+3. Add your account to your local genesis file with a given amount and the key you just created. Use only `10000000000uraptorx`, other amounts will be ignored.
+
+```bash
+raptord add-genesis-account $(raptord keys show <key-name> -a) 10000000000uraptorx
+```
+
+4. Create the gentx, use only `9000000000uraptorx`:
+
+```bash
+raptord gentx <key-name> 9000000000uraptorx --chain-id=torque-0
+```
+
+If all goes well, you will see a message similar to the following:
+
+```bash
+Genesis transaction written to "/home/user/.raptor/config/gentx/gentx-******.json"
+```
+
+5. Change minimum gas prices in `app.toml` to `0.0025uraptorx`.
+
+### Submit genesis transaction
+
+- Fork [the testnets repo](https://github.com/Karan-3108/testnets) into your Github account
+
+- Clone your repo using
+
+  ```bash
+  git clone https://github.com/<your-github-username>/testnets
+  ```
+
+- Copy the generated gentx json file to `<repo_path>/torque-0/gentx/`
+
+  ```sh
+  > cd testnets
+  > cp ~/.raptor/config/gentx/gentx*.json ./torque-0/gentx/
+  ```
+
+- Commit and push to your repo
+- Create a PR onto https://github.com/Karan-3108/testnets
+- Only PRs from individuals / groups with a history successfully running nodes will be accepted. This is to ensure the network successfully starts on time.
+
+#### Running in production
+
+**Note, we'll be going through some upgrades for this testnet. Consider using [Cosmovisor](https://github.com/cosmos/cosmos-sdk/tree/master/cosmovisor) to make your life easier.** Setting up Cosmovisor is covered in the [Raptor Documentation](https://docs.raptorchain.com/validators/setting-up-cosmovisor).
+
+Download Genesis file when the time is right. Put it in your `/home/<user>/.raptor` folder.
+
+If you have not installed cosmovisor, create a systemd file for your Raptor service:
+
+```sh
+sudo nano /etc/systemd/system/raptord.service
+```
+
+Copy and paste the following and update `<YOUR_USERNAME>` and `<CHAIN_ID>`:
+
+```sh
+Description=Raptor daemon
+After=network-online.target
+
+[Service]
+User=raptor
+ExecStart=/home/<YOUR_USERNAME>/go/bin/raptord start
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start the new service:
+
+```sh
+sudo systemctl enable raptord
+sudo systemctl start raptord
+```
+
+Check status:
+
+```sh
+raptord status
+```
+
+Check logs:
+
+```sh
+journalctl -u raptord -f
+```
+
+### Learn more
+
+- [Cosmos Network](https://cosmos.network)
+- [Raptor Documentation](https://docs.raptorchain.com/)

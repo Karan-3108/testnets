@@ -1,2 +1,1 @@
-# testnets
-The testnets repo for the Raptor Blockchain.
+uni/README.md
